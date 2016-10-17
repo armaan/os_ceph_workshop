@@ -1,9 +1,229 @@
-<%inherit file="lab.xml"/>\
-<%def name="section_name()">Operations</%def>\
-<%def name="section_url()">operations</%def>\
-<%block name="operations"/>\
-<%block name="hastexo_tests">\
-  <%text><test>
+<sequential
+  url_name="operations"
+  display_name="Operations"
+  graded="true"
+  format="Lab">
+
+<vertical
+  url_name="operations_unit"
+  display_name="Lab">
+
+<html
+  url_name="operations_instructions"
+  display_name="Operations Instructions">
+  <div class="lab_instructions">
+<h1>Operations.</h1>
+
+<h2>Create a glance image.</h2>
+
+<ol>
+<li><p>Fetch the image as follows:</p>
+
+<pre><code>$ cd
+$ wget http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+</code></pre></li>
+<li><p>Add it to Glance:</p>
+
+<pre><code>$ openstack image create \
+    --file cirros-0.3.4-x86_64-disk.img \
+    --disk-format qcow2 \
+    cirros
+</code></pre></li>
+<li><p>Verify that it was successful with:</p>
+
+<pre><code>$ openstack image list
+</code></pre></li>
+</ol>
+
+<p>You should see the freshly added image with its status displayed as "active".</p>
+
+<h2>Creating networks in Neutron</h2>
+
+<p>Now that Neutron is set up, you can use it to define networks.  In the
+<code>training</code> user's home directory on <code>deploy</code>, you'll find a
+<code>create-neutron-networks.sh</code> script. It will help you to create an initial set
+of networks and routers.</p>
+
+<p>In short, the script creates a virtual <code>test-net</code> private network in the
+"admin" tenant with a 10.0.6.0/24 mask, and a <code>test-router</code> with an interface
+in that network.</p>
+
+<blockquote>
+  <p>Note: It is recommended you open the script and read through it, in order to
+  understand how Neutron networks and routers are created from the command
+  line.</p>
+</blockquote>
+
+<p>Simply run it from <code>deploy</code> as the <code>training</code> user:</p>
+
+<ol>
+<li><p>If you're running as <code>root</code> (you can tell by the hash <code>#</code> sign on your
+promt), return to the <code>training</code> user shell:</p>
+
+<pre><code># exit
+</code></pre></li>
+<li><p>Make sure you're in the <code>training</code> user's home directory:</p>
+
+<pre><code>$ cd
+</code></pre></li>
+<li><p>Insert the proper credentials into the environment:</p>
+
+<pre><code>$ source ~/openstackrc
+</code></pre></li>
+<li><p>Run the script:</p>
+
+<pre><code>$ ./create-neutron-networks.sh
+</code></pre></li>
+</ol>
+
+<p>You can check that it worked by listing all networks:</p>
+
+<pre><code>$ openstack network list
+...
++--------------------------------------+----------+--------------------------------------+
+| ID                                   | Name     | Subnets                              |
++--------------------------------------+----------+--------------------------------------+
+| b6680bd1-808a-44d9-94db-03891490d0fe | test-net | 517c9938-a6c7-4b47-a6bd-9b099a6c217f |
++--------------------------------------+----------+--------------------------------------+
+</code></pre>
+
+<h2>Starting a VM</h2>
+
+<p>VMs can be started using any available image in Glance.  You may reference
+images either by their name or their ID: both are equally valid.</p>
+
+<p>You'll use the <code>cirros</code> image you uploaded earlier into Glance.  You can check
+it's <code>active</code> with the following command:</p>
+
+<pre><code>$ openstack image show cirros | grep status
+</code></pre>
+
+<p>Ideally, when starting a VM you will also assign it a port within a tenant
+network. To do so, you need first to pick the network!</p>
+
+<ol>
+<li><p>Run the command below to get a list of Neutron networks available.  Take
+note of the ID of the <code>test-net</code> network you created previously.  It is the
+first field on the output of the following command:</p>
+
+<pre><code>$ openstack network list | grep test-net
+...
+| 1930d616-6a68-4ff9-886d-5bcc56949a66 | test-net | ...
+</code></pre></li>
+<li><p>Pick the smallest <em>flavor</em> for your VM:</p>
+
+<pre><code>$ openstack flavor list
+</code></pre></li>
+<li><p>Run the following in order to launch a guest named "guest0" from the cirros
+image, using the "training" key and the "m1.tiny" flavor. Replace
+<code>[NETWORK_ID]</code> with the network ID you obtained above:</p>
+
+<pre><code>$ openstack server create \
+    --image cirros \
+    --flavor m1.tiny \
+    --nic net-id=[NETWORK_ID] \
+    guest0
+</code></pre></li>
+</ol>
+
+<p>You can watch the status of the boot as it unfolds with:</p>
+
+<pre><code>$ watch openstack server list
+</code></pre>
+
+<p>When the <code>Status</code> is "ACTIVE", press CTRL-C to exit.  This means the VM is
+running.  You can double-check by printing out the VM's console log:</p>
+
+<pre><code>$ openstack console log show guest0
+...
+  ____               ____  ____
+ / __/ __ ____ ____ / __ \/ __/
+/ /__ / // __// __// /_/ /\ \ 
+\___//_//_/  /_/   \____/___/ 
+   http://cirros-cloud.net
+
+login as 'cirros' user. default password: 'cubswin:)'. use 'sudo' for root.
+</code></pre>
+
+<h2>How to destroy and rebuild service specific containers.</h2>
+
+<p>Lets say, we have a horizon container which is misbehaving and we want to
+rebuild it.</p>
+
+<p>Destroy a container</p>
+
+<p>lxc-stop -n alice_horizon_container-7ef1c264
+   lxc-destroy -n alice_horizon_container-7ef1c264</p>
+
+<p>Rebuild the container</p>
+
+<p>openstack-ansible setup-hosts.yml --limit alice \
+    --limit alice_horizon_container-7ef1c264</p>
+
+<p>Install the service again   </p>
+
+<pre><code>openstack-ansible os-horizon-install.yml --limit alice_cinder_api_container-cafcfea0
+</code></pre>
+
+<h2>Enable swift api compatible acces to your ceph with radosgw.</h2>
+
+<p>Go to _deploy_ machine and execute these lines.</p>
+
+<pre><code># source openstackrc
+</code></pre>
+
+<p>Create a swift user</p>
+
+<pre><code># openstack user create --domain default --password-prompt swift
+</code></pre>
+
+<p>Assign admin role to the swift user.</p>
+
+<pre><code># openstack role add --project service --user swift admin
+</code></pre>
+
+<p>Create the swift service</p>
+
+<pre><code># openstack service create --name swift --description \
+    "OpenStack  Object Storage" object-store
+</code></pre>
+
+<p>Create swift endpoints.
+    openstack endpoint create --region RegionOne   swift public http://192.168.122.114:8080/swift/v1
+    openstack endpoint create --region RegionOne   swift internal http://192.168.122.114:8080/swift/v1
+    openstack endpoint create --region RegionOne   swift admin http://192.168.122.114:8080/swift/v1</p>
+
+<p>Add these lines to the ceph.conf file on _daisy_ and restart radosgw.</p>
+
+<pre><code>rgw keystone url = http://172.29.236.10:35357
+rgw keystone admin user = swift
+rgw keystone admin password = [Password]
+rgw keystone admin tenant = service
+rgw keystone accepted roles = Member, admin, swiftoperator
+rgw keystone token cache size = 500
+rgw keystone revocation interval = 500
+rgw s3 auth use keystone = true
+rgw nss db path = /var/ceph/nss
+</code></pre>
+
+<p>Restart radosgw service.</p>
+
+<pre><code># sudo service radosgw restart id=rgw.daisy
+</code></pre>
+
+<p>List swift containers:</p>
+
+<pre><code># swift list
+</code></pre>
+  </div>
+</html>
+
+<hastexo
+  display_name="Operations"
+  url_name="operations"
+  stack_template_path="hot_lab.yaml"
+  stack_user_name="training">
+  <test>
     #!/bin/bash -e
     export LC_ALL=C
 
@@ -30,8 +250,14 @@
 
     # Check that cirros image was successfully created
     openstack image list -f value | grep "cirros active"
-  </test></%text>\
-</%block>
+  </test>
+</hastexo>
+
+</vertical>
 
 
 
+
+
+
+</sequential>

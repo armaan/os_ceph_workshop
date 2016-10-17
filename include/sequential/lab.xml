@@ -32,16 +32,16 @@
 ##
 ## "introduction" block.  Override to create a custom unit.
 ##
-<%block name="introduction">
-<vertical
-  url_name="${self.introduction_unit_url()}"
-  display_name="${self.introduction_unit_name()}">
-${partials.markdown_file(
-  url_name=capture(self.content_markdown_url),
-  display_name=capture(self.content_markdown_name),
-  filename=capture(self.content_markdown_filename))}
-</vertical>
-</%block>
+##<%block name="introduction">
+##<vertical
+##  url_name="${self.introduction_unit_url()}"
+##  display_name="${self.introduction_unit_name()}">
+##${partials.markdown_file(
+##  url_name=capture(self.content_markdown_url),
+##  display_name=capture(self.content_markdown_name),
+##    filename=capture(self.content_markdown_filename))}
+##</vertical>
+##</%block>
 ##
 ## "lab" block.  Override to create a custom unit.
 ##
