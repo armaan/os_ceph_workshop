@@ -1,5 +1,5 @@
 <course
-  display_name="Automatic deployment & integration of OpenStack and Ceph with Ansible "
+  display_name="Automatic deployment and integration of OpenStack and Ceph with Ansible "
   url_name="summit"
   course="Ansible workshop"
   org="hastexo">

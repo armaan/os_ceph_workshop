@@ -3,7 +3,7 @@
 ## file must be in the root of a template lookup path, and the following must
 ## be defined:
 ##
-<%def name="display_name()">Automatic deployment & integration of OpenStack and Ceph with Ansible</%def>
+<%def name="display_name()">Automatic deployment and integration of OpenStack and Ceph with Ansible</%def>
 <%def name="course()">Ansible workshop</%def>
 <%def name="org()">hastexo</%def>
 ##
