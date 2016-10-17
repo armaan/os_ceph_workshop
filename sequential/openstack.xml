@@ -1,283 +1,45 @@
+
+
 <sequential
-  url_name="openstack"
   display_name="OpenStack"
-  graded="true"
-  format="Lab">
-
-<vertical
-  url_name="openstack_unit"
-  display_name="Lab">
-
-<html
-  url_name="openstack_instructions"
-  display_name="OpenStack Instructions">
-  <div class="lab_instructions">
-<h1>Deploy OpenStack</h1>
-
-<p>The lab environment is accessed via the terminal screen embedded below.  To
-find it, simply scroll down.</p>
-
-<h2>Overview</h2>
-
-<p>The lab environment consists of five virtual machines, accessible via the
-following local IP addresses.</p>
-
-<ul>
-<li>_deploy_: <strong><code>192.168.122.100</code></strong></li>
-<li>_alice_: <strong><code>192.168.122.111</code></strong></li>
-<li>_bob_: <strong><code>192.168.122.112</code></strong></li>
-<li>_charlie_: <strong><code>192.168.122.113</code></strong></li>
-<li>_daisy_: <strong><code>192.168.122.114</code></strong></li>
-</ul>
-
-<p>The _deploy_ node  has a publicly available IP address.
-Your terminal automatically connects to _deploy_.</p>
-
-<p>When you connect to _deploy_, you automatically enter a <code>screen</code> session.
-<code>screen</code> is a terminal multiplexer that, among other things, allows you
-reconnect to a previous session.  This means that if you close the browser page
-and return to the exercise later on, your session, including scrollback and
-command history, will be exactly as you left it.</p>
-
-<h2>SSH Between Nodes</h2>
-
-<p>You can use SSH from _deploy_ to hop to the other nodes.  To connect to
-_alice_, follow these instructions using the terminal below:</p>
-
-<ol>
-<li><p>From the _deploy_ node (it's where you start out), SSH into _alice_ by
-entering:</p>
-
-<pre><code>$ sudo -i
-# ssh alice
-</code></pre></li>
-<li><p>To confirm the authenticity of the host, enter "yes" at the prompt.</p></li>
-<li><p>Type the following to return to <code>deploy</code>:</p>
-
-<pre><code># exit
-</code></pre></li>
-<li><p>Repeat steps 1 to 3 for each of the other nodes, <code>bob</code>, <code>charlie</code>, and
-<code>daisy</code>.</p></li>
-</ol>
-
-<blockquote>
-  <p>Note: Whenever specific instructions are given as the ones above, do your
-  best to execute them as stated.  You will be graded on the results.</p>
-</blockquote>
-
-<h2>Configuration files.</h2>
-
-<p>The <em><code>/etc/openstack_deploy/openstack_user_config.yml</code></em> describes the layout for this environment.
-The <em><code>/etc/openstack_deploy/user_variables.yml</code></em> file defines the global overrides for the default variables
-The <em><code>/etc/openstack_deploy/user_secrets.yml</code></em> file contains service credentials for all services.</p>
-
-<h2>Bootstrapping OpenStack Ansible</h2>
-
-<p>The <code>deploy</code> node contains a checkout of the OSA repository, which you'll use
-to deploy OpenStack, in <code>/home/training/openstack-ansible</code>.  To install all
-prerequisites for running the OSA playbooks therein (including Ansible
-itself!), you must run the provided <code>bootstrap-ansible.sh</code> script.  On the
-terminal screen, execute it as follows:</p>
-
-<ol>
-<li><p>Change to the repository directory:</p>
-
-<pre><code>$ cd ~/openstack-ansible
-</code></pre></li>
-<li><p>Execute the script:</p>
-
-<pre><code>$ sudo scripts/bootstrap-ansible.sh
-</code></pre></li>
-</ol>
-
-<p>This will take a few minutes.  Once the execution is complete you should see
-output like this:</p>
-
-<pre><code>openstack-ansible script created.
-System is bootstrapped and ready for use.
-</code></pre>
-
-<p>This means that in addition to Ansible's own <code>ansible-playbook</code> program, the
-bootstrap script installed an <code>openstack-ansible</code> command.  The latter, which
-you'll be using throughout these labs, wraps <code>ansible-playbook</code>.  It makes the
-various configuration files available to the OSA playbooks without the need for
-unwieldy command line switches.</p>
-
-<h2>Preparing target hosts</h2>
-
-<p>Before you can deploying actual services, you must use OSA to prepare the nodes
-onto which you wish to deploy them.  To that end, OSA provides the
-<code>setup-hosts.yml</code> playbook.  This playbook will build the required LXC
-containers on the target hosts, and install common components into them.</p>
-
-<p>Before running it, however, take a quick look at how it's configured:</p>
-
-<pre><code>$ less /etc/openstack_deploy/openstack_user_config.yml
-</code></pre>
-
-<p>Scroll down and find the following stanza:</p>
-
-<pre><code>shared-infra_hosts:
-  alice:
-    affinity:
-      galera_container: 1
-      rabbit_mq_container: 1
-    ip: 172.29.236.10
-</code></pre>
-
-<p>Like all the <code>*_hosts</code> stanzas that follow, this is how you tell OSA about your
-pre-existing hardware, and how you want it used.  <code>shared-infra_hosts</code> lists
-hosts on which to deploy shared infrastructure services such as Galera and
-RabbitMQ. In this specific example, the <code>setup-hosts.yml</code> playbook can tell
-from the configuration that it'll have to create six LXC containers on the
-<code>alice</code> VM.</p>
-
-<p>To execute the playbook and set up all hosts (including <code>alice</code>, <code>bob</code>,
-<code>charlie</code>, and <code>daisy</code>), run the following commands in order:</p>
-
-<blockquote>
-  <p>Note: For security, your terminal connects to the lab environment as the
-  <code>training</code> user.  However, OSA requires playbooks to be run as the <code>root</code>
-  user; just <code>sudo</code> is not supported.  From this point on, whenever you
-  encounter command instructions preceded by the '#' character, you must
-  execute them as <code>root</code>.</p>
-</blockquote>
-
-<ol>
-<li><p>Change to the OSA playbooks directory:</p>
-
-<pre><code>$ cd ~/openstack-ansible/playbooks
-</code></pre></li>
-<li><p>Become root:</p>
-
-<pre><code>$ sudo su
-</code></pre></li>
-<li><p>Run the host setup playbook using the <code>openstack-ansible</code> command:</p>
-
-<pre><code># openstack-ansible setup-hosts.yml
-</code></pre></li>
-</ol>
-
-<p>If everything goes well, you should see a <em>PLAY RECAP</em> with several successful
-items, one for each of <code>alice</code>, <code>bob</code>, <code>charlie</code>, and <code>daisy</code>, as well as one
-for each of the containers that was created.</p>
-
-<h2>Deploying OpenStack infrastructure services</h2>
-
-<p>Once the target hosts are ready, you'll deploy the services OpenStack depends
-on, also called <em>infrastructure services</em>, but are not part of OpenStack
-itself: a SQL database and an AMPQ message queue server.  OSA supports Galera
-and RabbitMQ, respectively.</p>
-
-<p>OSA provides a 'setup-infrastructure.yml' playbook for these services.  Take a
-look at the playbook itself:</p>
-
-<pre><code># less setup-infrastructure.yml
-  ---
-  - include: haproxy-install.yml
-  - include: memcached-install.yml
-  - include: repo-install.yml
-  - include: galera-install.yml
-  - include: rabbitmq-install.yml
-  - include: utility-install.yml
-  - include: rsyslog-install.yml
-</code></pre>
-
-<p>You can tell by looking at the included playbooks that
-<code>setup-infrastructure.yml</code> installs Haproxy, Memcached, Galera, RabbitMQ,
-Rsyslog, and others services.</p>
-
-<blockquote>
-  <p>Note: You can install services individually by executing the above
-  service-specific playbooks separately.</p>
-</blockquote>
-
-<ol>
-<li><p>To execute the <code>setup-infrastructure.yml</code>, run the following, still as
-<code>root</code>:</p>
-
-<pre><code># openstack-ansible setup-infrastructure.yml
-</code></pre></li>
-</ol>
-
-<h2>Deploying OpenStack services.</h2>
-
-<p>Once the target hosts and <em>infrastructure services</em> are ready, you will deploy the
-OpenStack services.</p>
-
-<p>OSA provides a 'setup-openstack.yml' playbook for these services.  Take a
-look at the playbook itself:</p>
-
-<pre><code># less setup-openstack.yml
-
-- include: os-keystone-install.yml
-- include: os-glance-install.yml
-- include: os-cinder-install.yml
-- include: os-nova-install.yml
-- include: os-neutron-install.yml
-- include: os-heat-install.yml
-- include: os-horizon-install.yml
-</code></pre>
-
-<p>You can tell by looking at the included playbooks that
-<code>setup-openstack.yml</code> installs Keystone, Glance, Cinder, Nova,
-Neutron, Heat and Horizon services.</p>
-
-<blockquote>
-  <p>Note: You can install services individually by executing the above
-  service-specific playbooks separately.</p>
-</blockquote>
-
-<ol>
-<li><p>To execute the <code>setup-openstack.yml</code>, run the following, still as
-<code>root</code>:</p>
-
-<pre><code># openstack-ansible setup-openstack.yml
-</code></pre></li>
-</ol>
-
-<p>If the playbook execution is complete and you don't see any item as unreachable or failed 
-then you have deployed OpenStack successfully.</p>
-  </div>
-</html>
-
-<hastexo
-  display_name="OpenStack"
-  url_name="openstack"
-  stack_template_path="hot_lab.yaml"
-  stack_user_name="training">
-  <test>
-    #!/bin/bash
-    # Check for alice login
-    logins=$(ssh alice last training | grep training | wc -l)
-    [ $logins -ge 1 ] || exit 1
-    exit 0
-  </test>
-  <test>
-    #!/bin/bash
-    # Check for bob login
-    logins=$(ssh bob last training | grep training | wc -l)
-    [ $logins -ge 1 ] || exit 1
-    exit 0
-  </test>
-  <test>
-    #!/bin/bash
-    # Check for charlie login
-    logins=$(ssh charlie last training | grep training | wc -l)
-    [ $logins -ge 1 ] || exit 1
-    exit 0
-  </test>
-  <test>
-    #!/bin/bash
-    # Check for daisy login
-    logins=$(ssh daisy last training | grep training | wc -l)
-    [ $logins -ge 1 ] || exit 1
-    exit 0
-  </test>
-</hastexo>
-
-</vertical>
-
-
-
+  format="Lab"
+  graded="True">
+  <vertical
+    display_name="Unit 1"
+    url_name="openstack">
+    <html
+      display_name="openstack"
+      url_name="openstack">
+      <%block filter="olx_helpers.markdown_file">markdown/openstack_instructions.md</%block>
+    </html>
+  </vertical>
+  <vertical
+    display_name="Lab: Openstack"
+    url_name="openstack">
+    <hastexo
+      display_name="Lab: Openstack"
+      url_name="openstack"
+      instructions_path="openstack_instructions.md"
+      stack_template_path="lab.yaml"
+      stack_user_name="training"
+      os_auth_url="https://identity1.citycloud.com:5000/v3"
+      os_username="hastexo-lab"
+      os_password="eequ6pheishe0jia0eepoe9einaovoGh"
+      os_project_id="5ed51981f4a8468292bf2c578806ebf7"
+      os_region_name="Kna1"
+      os_user_domain_id="7cce9c47a7e54b7bb95f17423a45b418"
+      os_user_id="7ecbe49571b54234ab9f48a23267cc24">
+      <test>
+        #!/bin/bash -e
+        for i in daisy bob charlie; do
+          ssh $i dpkg -l ceph
+        done
+      </test>
+      <test>
+        #!/bin/bash -e
+        # Check if Ceph directory is present.
+        ls -l /etc/ceph
+      </test>
+    </hastexo>
+  </vertical>
 </sequential>
