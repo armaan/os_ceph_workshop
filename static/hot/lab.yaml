@@ -1,0 +1,1270 @@
+# academy-ubuntu-openstack.yaml
+#
+# Heat stack to deploy 5 Nova guests, pre-configured for deploying
+# Ubuntu OpenStack with Ansibl.
+#
+# Node roles are designated as follows:
+#
+# - deploy: Ansible and OpenStack client node
+# - alice: controller and dashboard nodes
+# - bob: controller and compute node
+# - charlie: controller and network gateway node
+# - daisy: ceph osd node
+heat_template_version: 2013-05-23
+
+description: >
+  5 Nova VMs pre-configured for OpenStack deployment with Ansible and Ceph
+
+parameters:
+  deploy_flavor:
+    type: string
+    description: Flavor to use for deploy node
+    default: 1C-2GB
+  controller_flavor:
+    type: string
+    description: Flavor to use for controller nodes
+    default: 4C-8GB-100GB
+  compute_flavor:
+    type: string
+    description: Flavor to use for compute nodes
+    default: 2C-4GB-50GB 
+  volume_flavor:
+    type: string
+    description: Flavor to use for volume nodes
+    default: 2C-4GB-20GB-20GB
+  gateway_flavor:
+    type: string
+    description: Flavor to use for network gateway nodes
+    default: 2C-4GB-50GB
+  public_net_id:
+    type: string
+    description: Public network ID
+    default: fba95253-5543-4078-b793-e2de58c31378
+  image:
+    type: string
+    description: Image ID or name
+    default: trusty-server-hwe-xenial-amd64-20160901
+  timeout:
+    type: number
+    description: Timeout for stack creation to finish
+    default: 900
+
+resources:
+  all_done:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: {get_resource: all_done_handle}
+      count: 5
+      timeout: {get_param: timeout}
+
+  all_done_handle:
+    type: OS::Heat::WaitConditionHandle
+
+  server_security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      description: Neutron security group rules
+      name: server_security_group
+      rules:
+      - remote_mode: 'remote_group_id'
+        remote_group_id:
+        direction: ingress
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: tcp
+        direction: ingress
+        port_range_min: 22
+        port_range_max: 22
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: icmp
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: tcp
+        direction: ingress
+        port_range_min: 80
+        port_range_max: 80
+      - remote_ip_prefix: 0.0.0.0/0
+        protocol: tcp
+        direction: ingress
+        port_range_min: 443
+        port_range_max: 443
+
+  user_keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: { get_param: 'OS::stack_name' }
+      save_private_key: true
+
+  ansible_config:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        package_update: false
+        package_upgrade: false
+        users:
+          - default
+          - name: training
+            groups: users,adm
+            lock-passwd: false
+            shell: /bin/bash
+            sudo: "ALL=(ALL) NOPASSWD:ALL"
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+          - name: root
+            lock-passwd: false
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+        write_files:
+          - path: /etc/cron.d/hwclock
+            permissions: '0644'
+            content: |
+              SHELL=/bin/sh
+              PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+              */5 * * * * root hwclock -s
+          - path: /etc/hosts
+            permissions: '0644'
+            content: |
+              127.0.0.1 localhost
+              ::1       ip6-localhost ip6-loopback
+              fe00::0   ip6-localnet
+              ff00::0   ip6-mcastprefix
+              ff02::1   ip6-allnodes
+              ff02::2   ip6-allrouters
+              192.168.122.100 deploy.example.com deploy
+              192.168.122.111 alice.example.com alice
+              192.168.122.112 bob.example.com bob
+              192.168.122.113 charlie.example.com charlie
+              192.168.122.114 daisy.example.com daisy
+              192.168.122.115 eric.example.com eric
+              192.168.122.116 frank.example.com frank
+              192.168.122.117 gina.example.com gina
+              192.168.122.118 harry.example.com harry
+              192.168.122.119 ian.example.com ian
+              192.168.122.120 julie.example.com julie
+              192.168.122.121 ken.example.com ken
+              192.168.122.122 laura.example.com laura
+          - path: /etc/network/interfaces.d/eth0.cfg
+            permissions: '0644'
+            content: |
+              auto eth0
+              iface eth0 inet dhcp
+                    post-up ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev $IFACE
+                    post-up ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev $IFACE
+                    post-up ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev $IFACE
+          - path: /etc/network/interfaces.d/eth1.cfg
+            permissions: '0644'
+            content: |
+              auto eth1
+              iface eth1 inet manual
+          - path: /etc/network/interfaces.d/openstack.cfg
+            permissions: '0644'
+            content: |
+              # VXLAN - Management
+              auto vxlan-mgmt
+              iface vxlan-mgmt inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-mgmt || true
+              # VXLAN - VXLAN
+              auto vxlan-vxlan
+              iface vxlan-vxlan inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-vxlan || true
+              # VXLAN - Storage
+              auto vxlan-storage
+              iface vxlan-storage inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-storage || true
+              # Bridge -Storage
+              auto br-storage
+              iface br-storage inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-storage
+                address 172.29.244.9
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge - Management
+              auto br-mgmt
+              iface br-mgmt inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-mgmt
+                address 172.29.236.9
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge VXLAN
+              auto br-vxlan
+              iface br-vxlan inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-vxlan
+                address 172.29.240.9
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+          - path: /etc/ntp.conf
+            permissions: '0644'
+            content: |
+              driftfile /var/lib/ntp/ntp.drift
+              statistics loopstats peerstats clockstats
+              filegen loopstats file loopstats type day enable
+              filegen peerstats file peerstats type day enable
+              filegen clockstats file clockstats type day enable
+              server 0.ubuntu.pool.ntp.org iburst
+              server 1.ubuntu.pool.ntp.org iburst
+              server 2.ubuntu.pool.ntp.org iburst
+              server 3.ubuntu.pool.ntp.org iburst
+              server ntp.ubuntu.com
+              restrict -4 default kod notrap nomodify nopeer noquery
+              restrict -6 default kod notrap nomodify nopeer noquery
+              restrict 127.0.0.1
+              restrict ::1
+          - path: /etc/openstack_deploy/openstack_user_config.yml
+            permissions: '0644'
+            content: |
+              ---
+              cidr_networks:
+                container: 172.29.236.0/22
+                tunnel: 172.29.240.0/22
+                storage: 172.29.244.0/22
+              used_ips:
+                - 172.29.236.1,172.29.236.50
+                - 172.29.240.1,172.29.240.50
+                - 172.29.244.1,172.29.244.50
+                - 172.29.248.1,172.29.248.50
+              global_overrides:
+                internal_lb_vip_address: 172.29.236.10
+                external_lb_vip_address: 192.168.122.111
+                tunnel_bridge: "br-vxlan"
+                management_bridge: "br-mgmt"
+                provider_networks:
+                  - network:
+                      container_bridge: "br-mgmt"
+                      container_type: "veth"
+                      container_interface: "eth1"
+                      ip_from_q: "container"
+                      type: "raw"
+                      group_binds:
+                        - all_containers
+                        - hosts
+                      is_container_address: true
+                      is_ssh_address: true
+                  - network:
+                      container_bridge: "br-vxlan"
+                      container_type: "veth"
+                      container_interface: "eth10"
+                      ip_from_q: "tunnel"
+                      type: "vxlan"
+                      range: "1:1000"
+                      net_name: "vxlan"
+                      group_binds:
+                        - neutron_linuxbridge_agent
+                  - network:
+                      container_bridge: "br-storage"
+                      container_type: "veth"
+                      container_interface: "eth2"
+                      ip_from_q: "storage"
+                      type: "raw"
+                      group_binds:
+                        - glance_api
+                        - cinder_api
+                        - cinder_volume
+                        - nova_compute
+              shared-infra_hosts:
+                alice:
+                  affinity:
+                    galera_container: 1
+                    rabbit_mq_container: 1
+                  ip: 172.29.236.10
+                bob:
+                  affinity:
+                    galera_container: 1
+                    rabbit_mq_container: 1
+                  ip: 172.29.236.11
+                charlie:
+                  affinity:
+                    galera_container: 1
+                    rabbit_mq_container: 1
+                  ip: 172.29.236.12
+              os-infra_hosts:
+                alice:
+                  ip: 172.29.236.10
+                bob:
+                  ip: 172.29.236.11
+                charlie:
+                  ip: 172.29.236.12
+              repo-infra_hosts:
+                alice:
+                  ip: 172.29.236.10
+                bob:
+                  ip: 172.29.236.11
+                charlie:
+                  ip: 172.29.236.12
+              identity_hosts:
+                alice:
+                  ip: 172.29.236.10
+                bob:
+                  ip: 172.29.236.11
+                charlie:
+                  ip: 172.29.236.12
+              compute_hosts:
+                bob:
+                  ip: 172.29.236.11
+              storage-infra_hosts:
+                alice:
+                  ip: 172.29.236.10
+                bob:
+                  ip: 172.29.236.11
+                charlie:
+                  ip: 172.29.236.12
+              storage_hosts:
+                daisy:
+                  ip: 172.29.236.13
+                  container_vars:
+                    cinder_backends:
+                      limit_container_types: cinder_volume
+                      rbd:
+                        volume_group: cinder-volumes
+                        volume_driver: cinder.volume.drivers.rbd.RBDDriver
+                        volume_backend_name: rbd
+                        rbd_pool: rbd
+                        rbd_ceph_conf: /etc/ceph/ceph.conf
+                        rbd_user: cinder #"{{ cinder_ceph_client }}"
+
+              network_hosts:
+                charlie:
+                  ip: 172.29.236.12
+
+              haproxy_hosts:
+                alice:
+                  ip: 172.29.236.10
+          - path: /etc/openstack_deploy/user_variables.yml
+            permissions: '0644'
+            content: |
+              ---
+              ceilometer_db_type: mongodb
+              ceilometer_db_ip: localhost
+              ceilometer_db_port: 27017
+              swift_ceilometer_enabled: False
+              heat_ceilometer_enabled: False
+              cinder_ceilometer_enabled: False
+              glance_ceilometer_enabled: False
+              glance_default_store: rbd
+              glance_ceph_client: cinder
+              glance_rbd_store_pool: rbd #images
+              glance_rbd_store_chunk_size: 8
+              nova_libvirt_images_rbd_pool: rbd #vms
+              nova_ceph_client: cinder #nova
+              cinder_ceph_client: cinder
+              ceph_apt_repo_url_region: "eu"  # or "eu" for Netherlands based mirror
+              ceph_stable_release: jewel
+              cephx: true
+              ceph_mons:
+                - 172.29.236.11
+                - 172.29.236.12
+                - 172.29.236.13
+              nova_ceilometer_enabled: False
+              neutron_ceilometer_enabled: False
+              aodh_db_type: mongodb
+              aodh_db_ip: localhost
+              aodh_db_port: 27017
+              glance_notification_driver: noop
+              glance_swift_store_endpoint_type: internalURL
+              nova_virt_type: qemu
+              lxc_container_default_mtu: 1450
+              keystone_auth_admin_password: openstack
+              ssl_protocol: "ALL -SSLv2 -SSLv3"
+              ssl_cipher_suite: "ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS"
+              neutron_dhcp_config:
+                dhcp-option-force: "26,1400"
+                log-facility: "/var/log/neutron/neutron-dnsmasq.log"
+          - path: '/home/training/create-neutron-networks.sh'
+            permissions: '0755'
+            content: |
+              #!/bin/sh -ex
+              neutron net-create test-net
+              neutron subnet-create --name test-subnet \
+                --dns-nameserver 8.8.8.8 \
+                --dns-nameserver 8.8.4.4 \
+                test-net 10.0.6.0/24
+              neutron router-create test-router
+              neutron router-interface-add test-router test-subnet
+          - path: '/home/training/get-cirros-image.sh'
+            permissions: '0755'
+            content: |
+              #!/bin/sh -ex
+              wget http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
+
+              glance image-create \
+              --progress \
+              --file=cirros-0.3.4-x86_64-disk.img \
+              --name="cirros" \
+              --container-format ovf \
+              --visibility public \
+              --disk-format qcow2
+          - path: '/home/training/add-security-group-rules.sh'
+            permissions: '0755'
+            content: |
+              #!/bin/sh -ex
+              neutron security-group-rule-create \
+                      --protocol icmp \
+                      default
+              neutron security-group-rule-create \
+                      --protocol tcp \
+                      --port-range-min=22 \
+                      --port-range-max=22 \
+                      default
+          - path: '/home/training/openstackrc'
+            permissions: '0600'
+            content: |
+              #!/bin/bash
+              export LC_ALL=C
+
+              # COMMON CINDER ENVS
+              export CINDER_ENDPOINT_TYPE=internalURL
+
+              # COMMON NOVA ENVS
+              export NOVA_ENDPOINT_TYPE=internalURL
+
+              # COMMON OPENSTACK ENVS
+              export OS_ENDPOINT_TYPE=internalURL
+              export OS_USERNAME=admin
+              export OS_PASSWORD=openstack
+              export OS_PROJECT_NAME=admin
+              export OS_TENANT_NAME=admin
+              export OS_AUTH_URL=http://172.29.236.10:5000/v3
+              export OS_NO_CACHE=1
+              export OS_USER_DOMAIN_NAME=Default
+              export OS_PROJECT_DOMAIN_NAME=Default
+
+              # For openstackclient
+              export OS_IDENTITY_API_VERSION=3
+              export OS_AUTH_VERSION=3
+          - path: '/home/training/.ssh/id_rsa'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, private_key ] }
+          - path: '/root/.ssh/id_rsa'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, private_key ] }
+          - path: '/root/.ssh/id_rsa.pub'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, public_key ] }
+        packages:
+          - ntp
+          - screen
+          - python-pip
+          - bridge-utils
+          - debootstrap
+          - ifenslave
+          - lsof
+          - lvm2
+          - ntpdate
+          - vlan
+          - aptitude
+          - build-essential
+          - git
+          - python-dev
+        runcmd:
+          - ifup br-storage
+          - ifup br-mgmt
+          - ifup br-vxlan
+          - ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev eth0
+          - ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev eth0
+          - ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev eth0
+          - git clone -b stable/mitaka https://github.com/openstack/openstack-ansible.git /home/training/openstack-ansible
+          - sudo pip install pycrypto pytz pbr python-cinderclient python-glanceclient python-openstackclient python-keystoneclient python-neutronclient python-novaclient python-heatclient
+          - cp -n -R /home/training/openstack-ansible/etc/openstack_deploy /etc
+          - sudo /home/training/openstack-ansible/scripts/pw-token-gen.py --file /etc/openstack_deploy/user_secrets.yml
+          - cp /etc/skel/.??* /home/training
+          - echo "exec /usr/bin/screen -xRR" >> /home/training/.profile
+          - chown -R training:training /home/training
+          - sleep `bash -c 'echo $[($RANDOM % 10) + 1]'`
+          - { get_attr: ['all_done_handle', 'curl_cli'] }
+
+
+  controller_config:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        package_update: false
+        package_upgrade: false
+        users:
+          - default
+          - name: training
+            groups: users,adm
+            lock-passwd: false
+            shell: /bin/bash
+            sudo: "ALL=(ALL) NOPASSWD:ALL"
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+          - name: root
+            lock-passwd: false
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+        write_files:
+          - path: /etc/cron.d/hwclock
+            permissions: '0644'
+            content: |
+              SHELL=/bin/sh
+              PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+              */5 * * * *   root  hwclock -s
+          - path: /etc/hosts
+            permissions: '0644'
+            content: |
+              127.0.0.1 localhost
+              ::1       ip6-localhost ip6-loopback
+              fe00::0   ip6-localnet
+              ff00::0   ip6-mcastprefix
+              ff02::1   ip6-allnodes
+              ff02::2   ip6-allrouters
+              192.168.122.100 deploy.example.com deploy
+              192.168.122.111 alice.example.com alice
+              192.168.122.112 bob.example.com bob
+              192.168.122.113 charlie.example.com charlie
+              192.168.122.114 daisy.example.com daisy
+              192.168.122.115 eric.example.com eric
+              192.168.122.116 frank.example.com frank
+              192.168.122.117 gina.example.com gina
+              192.168.122.118 harry.example.com harry
+              192.168.122.119 ian.example.com ian
+              192.168.122.120 julie.example.com julie
+              192.168.122.121 ken.example.com ken
+              192.168.122.122 laura.example.com laura
+          - path: /etc/network/interfaces.d/eth0.cfg
+            permissions: '0644'
+            content: |
+              auto eth0
+              iface eth0 inet dhcp
+                    post-up ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev $IFACE
+                    post-up ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev $IFACE
+                    post-up ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev $IFACE
+          - path: /etc/network/interfaces.d/eth1.cfg
+            permissions: '0644'
+            content: |
+              auto eth1
+              iface eth1 inet manual
+          - path: /etc/network/interfaces.d/openstack.cfg
+            permissions: '0644'
+            content: |
+              # VXLAN - Management
+              auto vxlan-mgmt
+              iface vxlan-mgmt inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-mgmt || true
+              # VXLAN - VXLAN
+              auto vxlan-vxlan
+              iface vxlan-vxlan inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-vxlan || true
+              # VXLAN - Storage
+              auto vxlan-storage
+              iface vxlan-storage inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-storage || true
+              # Bridge -Storage
+              auto br-storage
+              iface br-storage inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-storage
+                address 172.29.244.10
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge - Management
+              auto br-mgmt
+              iface br-mgmt inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-mgmt
+                address 172.29.236.10
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge VXLAN
+              auto br-vxlan
+              iface br-vxlan inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-vxlan
+                address 172.29.240.10
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+        mounts:
+          - [ 'vdb', null ]
+        packages:
+          - ntpdate
+          - bridge-utils
+          - debootstrap
+          - ifenslave
+          - lsof
+          - lvm2
+          - ntpdate
+          - vlan
+          - aptitude
+          - build-essential
+          - git
+          - python-dev
+        runcmd:
+          - ifup br-storage
+          - ifup br-mgmt
+          - ifup br-vxlan
+          - ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev eth0
+          - ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev eth0
+          - ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev eth0
+          - cp /etc/skel/.??* /home/training
+          - chown -R training:training /home/training
+          - sleep `bash -c 'echo $[($RANDOM % 10) + 1]'`
+          - { get_attr: ['all_done_handle', 'curl_cli'] }
+
+  compute_config:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        package_update: false
+        package_upgrade: false
+        users:
+          - default
+          - name: training
+            groups: users,adm
+            lock-passwd: false
+            shell: /bin/bash
+            sudo: "ALL=(ALL) NOPASSWD:ALL"
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+          - name: root
+            lock-passwd: false
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+        write_files:
+          - path: /etc/cron.d/hwclock
+            permissions: '0644'
+            content: |
+              SHELL=/bin/sh
+              PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+              */5 * * * *   root  hwclock -s
+          - path: /etc/hosts
+            permissions: '0644'
+            content: |
+              127.0.0.1 localhost
+              ::1       ip6-localhost ip6-loopback
+              fe00::0   ip6-localnet
+              ff00::0   ip6-mcastprefix
+              ff02::1   ip6-allnodes
+              ff02::2   ip6-allrouters
+              192.168.122.100 deploy.example.com deploy
+              192.168.122.111 alice.example.com alice
+              192.168.122.112 bob.example.com bob
+              192.168.122.113 charlie.example.com charlie
+              192.168.122.114 daisy.example.com daisy
+              192.168.122.115 eric.example.com eric
+              192.168.122.116 frank.example.com frank
+              192.168.122.117 gina.example.com gina
+              192.168.122.118 harry.example.com harry
+              192.168.122.119 ian.example.com ian
+              192.168.122.120 julie.example.com julie
+              192.168.122.121 ken.example.com ken
+              192.168.122.122 laura.example.com laura
+          - path: /etc/network/interfaces.d/eth0.cfg
+            permissions: '0644'
+            content: |
+              auto eth0
+              iface eth0 inet dhcp
+                    post-up ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev $IFACE
+                    post-up ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev $IFACE
+                    post-up ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev $IFACE
+          - path: /etc/network/interfaces.d/eth1.cfg
+            permissions: '0644'
+            content: |
+              auto eth1
+              iface eth1 inet manual
+          - path: /etc/network/interfaces.d/openstack.cfg
+            permissions: '0644'
+            content: |
+              # VXLAN - Management
+              auto vxlan-mgmt
+              iface vxlan-mgmt inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-mgmt || true
+              # VXLAN - VXLAN
+              auto vxlan-vxlan
+              iface vxlan-vxlan inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-vxlan || true
+              # VXLAN - Storage
+              auto vxlan-storage
+              iface vxlan-storage inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-storage || true
+              # Bridge -Storage
+              auto br-storage
+              iface br-storage inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-storage
+                address 172.29.244.11
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge - Management
+              auto br-mgmt
+              iface br-mgmt inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-mgmt
+                address 172.29.236.11
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge VXLAN
+              auto br-vxlan
+              iface br-vxlan inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-vxlan
+                address 172.29.240.11
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+        packages:
+          - ntpdate
+          - bridge-utils
+          - debootstrap
+          - ifenslave
+          - lsof
+          - lvm2
+          - ntpdate
+          - vlan
+          - aptitude
+          - build-essential
+          - git
+          - python-dev
+        runcmd:
+          - ifup br-storage
+          - ifup br-mgmt
+          - ifup br-vxlan
+          - ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev eth0
+          - ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev eth0
+          - ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev eth0
+          - cp /etc/skel/.??* /home/training
+          - chown -R training:training /home/training
+          - sleep `bash -c 'echo $[($RANDOM % 10) + 1]'`
+          - { get_attr: ['all_done_handle', 'curl_cli'] }
+
+  gateway_config:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        package_update: false
+        package_upgrade: false
+        users:
+          - default
+          - name: training
+            groups: users,adm
+            lock-passwd: false
+            shell: /bin/bash
+            sudo: "ALL=(ALL) NOPASSWD:ALL"
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+          - name: root
+            lock-passwd: false
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+        write_files:
+          - path: /etc/cron.d/hwclock
+            permissions: '0644'
+            content: |
+              SHELL=/bin/sh
+              PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+              */5 * * * *   root  hwclock -s
+          - path: /etc/hosts
+            permissions: '0644'
+            content: |
+              127.0.0.1 localhost
+              ::1       ip6-localhost ip6-loopback
+              fe00::0   ip6-localnet
+              ff00::0   ip6-mcastprefix
+              ff02::1   ip6-allnodes
+              ff02::2   ip6-allrouters
+              192.168.122.100 deploy.example.com deploy
+              192.168.122.111 alice.example.com alice
+              192.168.122.112 bob.example.com bob
+              192.168.122.113 charlie.example.com charlie
+              192.168.122.114 daisy.example.com daisy
+              192.168.122.115 eric.example.com eric
+              192.168.122.116 frank.example.com frank
+              192.168.122.117 gina.example.com gina
+              192.168.122.118 harry.example.com harry
+              192.168.122.119 ian.example.com ian
+              192.168.122.120 julie.example.com julie
+              192.168.122.121 ken.example.com ken
+              192.168.122.122 laura.example.com laura
+          - path: /etc/network/interfaces.d/eth0.cfg
+            permissions: '0644'
+            content: |
+              auto eth0
+              iface eth0 inet dhcp
+                    post-up ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev $IFACE
+                    post-up ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev $IFACE
+                    post-up ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev $IFACE
+          - path: /etc/network/interfaces.d/eth1.cfg
+            permissions: '0644'
+            content: |
+              auto eth1
+              iface eth1 inet manual
+          - path: /etc/network/interfaces.d/openstack.cfg
+            permissions: '0644'
+            content: |
+              # VXLAN - Management
+              auto vxlan-mgmt
+              iface vxlan-mgmt inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-mgmt || true
+              # VXLAN - VXLAN
+              auto vxlan-vxlan
+              iface vxlan-vxlan inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-vxlan || true
+              # VXLAN - Storage
+              auto vxlan-storage
+              iface vxlan-storage inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-storage || true
+              # Bridge -Storage
+              auto br-storage
+              iface br-storage inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-storage
+                address 172.29.244.12
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge - Management
+              auto br-mgmt
+              iface br-mgmt inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-mgmt
+                address 172.29.236.12
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge VXLAN
+              auto br-vxlan
+              iface br-vxlan inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-vxlan
+                address 172.29.240.12
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+        packages:
+          - ntpdate
+          - bridge-utils
+          - debootstrap
+          - ifenslave
+          - lsof
+          - lvm2
+          - ntpdate
+          - vlan
+          - aptitude
+          - build-essential
+          - git
+          - python-dev
+        runcmd:
+          - ifup br-storage
+          - ifup br-mgmt
+          - ifup br-vxlan
+          - ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev eth0
+          - ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev eth0
+          - ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev eth0
+          - cp /etc/skel/.??* /home/training
+          - chown -R training:training /home/training
+          - sleep `bash -c 'echo $[($RANDOM % 10) + 1]'`
+          - { get_attr: ['all_done_handle', 'curl_cli'] }
+
+  volume_1_config:
+    type: "OS::Heat::CloudConfig"
+    properties:
+      cloud_config:
+        package_update: false
+        package_upgrade: false
+        users:
+          - default
+          - name: training
+            groups: users,adm
+            lock-passwd: false
+            shell: /bin/bash
+            sudo: "ALL=(ALL) NOPASSWD:ALL"
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+          - name: root
+            lock-passwd: false
+            shell: /bin/bash
+            ssh_authorized_keys:
+              - { get_attr: [ user_keypair, public_key ] }
+        write_files:
+          - path: /etc/cron.d/hwclock
+            permissions: '0644'
+            content: |
+              SHELL=/bin/sh
+              PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+              */5 * * * *   root  hwclock -s
+          - path: /etc/hosts
+            permissions: '0644'
+            content: |
+              127.0.0.1 localhost
+              ::1       ip6-localhost ip6-loopback
+              fe00::0   ip6-localnet
+              ff00::0   ip6-mcastprefix
+              ff02::1   ip6-allnodes
+              ff02::2   ip6-allrouters
+              192.168.122.100 deploy.example.com deploy
+              192.168.122.111 alice.example.com alice
+              192.168.122.112 bob.example.com bob
+              192.168.122.113 charlie.example.com charlie
+              192.168.122.114 daisy.example.com daisy
+              192.168.122.115 eric.example.com eric
+              192.168.122.116 frank.example.com frank
+              192.168.122.117 gina.example.com gina
+              192.168.122.118 harry.example.com harry
+              192.168.122.119 ian.example.com ian
+              192.168.122.120 julie.example.com julie
+              192.168.122.121 ken.example.com ken
+              192.168.122.122 laura.example.com laura
+          - path: /home/training/hosts
+            permissions: '0644'
+            content: |
+              [mons]
+              192.168.122.11[2:4]
+
+              [osds]
+              192.168.122.114
+
+              [rgws]
+              192.168.122.11[2:4]
+
+          - path: /home/training/all
+            permissions: '0644'
+            content: |
+              ---
+              dummy:
+              fetch_directory: fetch/
+              cluster: ceph
+              ceph_stable: true # use ceph stable branch
+              ceph_stable_key: http://eu.ceph.com/keys/release.asc
+              ceph_stable_repo: "http://eu.ceph.com/debian-{{ ceph_stable_release }}"
+              ceph_stable_release: jewel # ceph stable release
+              monitor_interface: eth0
+              journal_size: 10240 # OSD journal size in MB
+              public_network: 192.168.122.0/24
+              osd_mkfs_type: xfs
+              osd_mkfs_options_xfs: -f -i size=2048
+              radosgw_civetweb_port: 8080
+              ceph_conf_overrides:
+                global:
+                  osd pool default min size: 1
+                  osd pool default size: 1
+
+          - path: /home/training/osds
+            permissions: '0644'
+            content: |
+              ---
+              dummy:
+              crush_location: false
+              osd_crush_location: "'root={{ ceph_crush_root }} rack={{ ceph_crush_rack }} host={{ ansible_hostname }}'"
+              devices:
+                - /dev/vdb
+              journal_collocation: true
+
+          - path: /etc/network/interfaces.d/eth0.cfg
+            permissions: '0644'
+            content: |
+              auto eth0
+              iface eth0 inet dhcp
+                post-up ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev $IFACE
+                post-up ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev $IFACE
+                post-up ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev $IFACE
+          - path: '/home/training/.ssh/id_rsa'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, private_key ] }
+          - path: '/root/.ssh/id_rsa'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, private_key ] }
+          - path: '/root/.ssh/id_rsa.pub'
+            permissions: '0600'
+            content: { get_attr: [ user_keypair, public_key ] }
+          - path: /etc/network/interfaces.d/openstack.cfg
+            permissions: '0644'
+            content: |
+              # VXLAN - Management
+              auto vxlan-mgmt
+              iface vxlan-mgmt inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-mgmt || true
+              # VXLAN - VXLAN
+              auto vxlan-vxlan
+              iface vxlan-vxlan inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-vxlan || true
+              # VXLAN - Storage
+              auto vxlan-storage
+              iface vxlan-storage inet manual
+                pre-up while ! ifquery --state eth0; do sleep 1s; done
+                up ip link set $IFACE up
+                down ip link set $IFACE down
+                post-down ip link del vxlan-storage || true
+              # Bridge -Storage
+              auto br-storage
+              iface br-storage inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-storage
+                address 172.29.244.13
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge - Management
+              auto br-mgmt
+              iface br-mgmt inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-mgmt
+                address 172.29.236.13
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+              # Bridge VXLAN
+              auto br-vxlan
+              iface br-vxlan inet static
+                bridge_stp off
+                bridge_fd 0
+                bridge_ports vxlan-vxlan
+                address 172.29.240.13
+                netmask 255.255.252.0
+                dns-nameservers 8.8.8.8
+        mounts:
+          - [ 'vdb', null ]
+        packages:
+          - ntpdate
+          - bridge-utils
+          - debootstrap
+          - ifenslave
+          - lsof
+          - lvm2
+          - ntpdate
+          - vlan
+          - aptitude
+          - build-essential
+          - git
+          - python-dev
+        runcmd:
+          - ifup br-storage
+          - ifup br-mgmt
+          - ifup br-vxlan
+          - ip link add vxlan-mgmt type vxlan id 10 group 239.0.0.10 dev eth0
+          - ip link add vxlan-vxlan type vxlan id 20 group 239.0.0.20 dev eth0
+          - ip link add vxlan-storage type vxlan id 30 group 239.0.0.30 dev eth0
+          - pvcreate /dev/vdb
+          - vgcreate cinder-volumes /dev/vdb
+          - cp /etc/skel/.??* /home/training
+          - chown -R training:training /home/training
+          - sleep `bash -c 'echo $[($RANDOM % 10) + 1]'`
+          - { get_attr: ['all_done_handle', 'curl_cli'] }
+          - git clone https://github.com/ceph/ceph-ansible.git /home/training/ceph-ansible
+          - mv /home/training/all /home/training/ceph-ansible/group_vars/
+          - mv /home/training/osds /home/training/ceph-ansible/group_vars/
+          - mv /home/training/hosts /home/training/ceph-ansible/hosts
+          - cp /home/training/ceph-ansible/site.yml.sample /home/training/ceph-ansible/site.yml
+          - sudo add-apt-repository -y ppa:ansible/ansible
+          - sudo apt-get update
+          - sudo apt-get install -y ansible
+
+  management_net:
+    type: OS::Neutron::Net
+    properties:
+      name: management-net
+
+  management_sub_net:
+    type: OS::Neutron::Subnet
+    properties:
+      name: management-sub-net
+      network_id: { get_resource: management_net }
+      cidr: 192.168.122.0/24
+      gateway_ip: 192.168.122.1
+      enable_dhcp: true
+      allocation_pools: [{"start": "192.168.122.200", "end": "192.168.122.250"}]
+      dns_nameservers:
+        - 8.8.8.8
+        - 8.8.4.4
+
+  router:
+    type: OS::Neutron::Router
+
+  router_gateway:
+    type: OS::Neutron::RouterGateway
+    properties:
+      router_id: { get_resource: router }
+      network_id: { get_param: public_net_id }
+
+  router_interface:
+    type: OS::Neutron::RouterInterface
+    properties:
+      router_id: { get_resource: router }
+      subnet_id: { get_resource: management_sub_net }
+  
+
+  deploy:
+    type: OS::Nova::Server
+    properties:
+      name: deploy
+      image: { get_param: image }
+      flavor: { get_param: deploy_flavor }
+      user_data: { get_resource: ansible_config }
+      user_data_format: RAW
+      networks:
+        - port: { get_resource: deploy_management_port }
+
+  deploy_management_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: management_net }
+      security_groups:
+        - { get_resource: server_security_group }
+      fixed_ips:
+        - ip_address: 192.168.122.100
+
+
+  deploy_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: deploy_management_port }
+
+  alice:
+    type: OS::Nova::Server
+    properties:
+      name: alice
+      image: { get_param: image }
+      flavor: { get_param: controller_flavor }
+      user_data: { get_resource: controller_config }
+      user_data_format: RAW
+      networks:
+        - port: { get_resource: alice_management_port }
+
+  alice_management_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: management_net }
+      security_groups:
+        - { get_resource: server_security_group }
+      fixed_ips:
+        - ip_address: 192.168.122.111
+      allowed_address_pairs:
+        - ip_address: 172.29.224.0/19
+
+
+  alice_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: { get_param: public_net_id }
+      port_id: { get_resource: alice_management_port }
+
+  bob:
+    type: OS::Nova::Server
+    properties:
+      name: bob
+      image: { get_param: image }
+      flavor: { get_param: compute_flavor }
+      user_data: { get_resource: compute_config }
+      user_data_format: RAW
+      networks:
+        - port: { get_resource: bob_management_port }
+
+  bob_management_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: management_net }
+      security_groups:
+        - { get_resource: server_security_group }
+      fixed_ips:
+        - ip_address: 192.168.122.112
+      allowed_address_pairs:
+        - ip_address: 172.29.224.0/19
+  
+  charlie:
+    type: OS::Nova::Server
+    properties:
+      name: charlie
+      image: { get_param: image }
+      flavor: { get_param: gateway_flavor }
+      user_data: { get_resource: gateway_config }
+      user_data_format: RAW
+      networks:
+        - port: { get_resource: charlie_management_port }
+
+  charlie_management_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: management_net }
+      security_groups:
+        - { get_resource: server_security_group }
+      fixed_ips:
+        - ip_address: 192.168.122.113
+      allowed_address_pairs:
+        - ip_address: 172.29.224.0/19
+  daisy:
+    type: OS::Nova::Server
+    properties:
+      name: daisy
+      image: { get_param: image }
+      flavor: { get_param: volume_flavor }
+      user_data: { get_resource: volume_1_config }
+      user_data_format: RAW
+      networks:
+        - port: { get_resource: daisy_management_port }
+
+  daisy_management_port:
+    type: OS::Neutron::Port
+    properties:
+      network_id: { get_resource: management_net }
+      security_groups:
+        - { get_resource: server_security_group }
+      fixed_ips:
+        - ip_address: 192.168.122.114
+      allowed_address_pairs:
+        - ip_address: 172.29.224.0/19
+
+
+outputs:
+  public_ip:
+    description: Floating IP address of deploy host in public network
+    value: { get_attr: [ deploy_floating_ip, floating_ip_address ] }
+  private_key:
+    description: Training private key
+    value: { get_attr: [ user_keypair, private_key ] }
+  dashboard_ip:
+    description: Floating IP address of Horizon host in public network
+    value: { get_attr: [ alice_floating_ip, floating_ip_address ] }
+

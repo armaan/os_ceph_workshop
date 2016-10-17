@@ -1,0 +1,12 @@
+<%inherit file="lab.xml"/>\
+<%def name="section_name()">Ceph</%def>\
+<%def name="section_url()">ceph</%def>\
+<%block name="ceph"/>\
+<%block name="hastexo_tests">\
+  <%text><test>
+    #!/bin/bash -e
+        for i in daisy bob charlie; do
+          ssh $i dpkg -l ceph
+        done
+  </test></%text>\
+</%block>

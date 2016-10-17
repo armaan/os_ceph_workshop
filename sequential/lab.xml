@@ -1,0 +1,92 @@
+<%namespace file='/olx_partials.xml' name='partials' inheritable="True"/>\
+##
+## These must be set on child templates.
+##
+<%def name='section_url()'/>\
+<%def name='section_name()'/>\
+##
+## Regular defs.  By convention, non-XML strings are defined here.
+##
+<%def name='graded()'>true</%def>\
+<%def name='format()'>Lab</%def>\
+<%def name='introduction_unit_url()'>${self.section_url()}_introduction</%def>\
+<%def name='introduction_unit_name()'>Introduction</%def>\
+<%def name='introduction_markdown_url()'>${self.section_url()}_introduction</%def>\
+<%def name='introduction_markdown_name()'>${self.section_name()} Introduction</%def>\
+<%def name='introduction_markdown_filename()'>markdown/${self.introduction_markdown_url()}.md</%def>\
+<%def name='lab_unit_url()'>${self.section_url()}_unit</%def>\
+<%def name='lab_unit_name()'>Lab</%def>\
+<%def name='lab_markdown_url()'>${self.section_url()}_instructions</%def>\
+<%def name='lab_markdown_name()'>${self.section_name()} Instructions</%def>\
+<%def name='lab_markdown_filename()'>markdown/${self.lab_markdown_url()}.md</%def>\
+<%def name='lab_url()'>${self.section_url()}</%def>\
+<%def name='lab_name()'>${self.section_name()}</%def>\
+##
+## Sequential block definition. Not overridable.
+##
+<sequential
+  url_name="${self.section_url()}"
+  display_name="${self.section_name()}"
+  graded="${self.graded()}"
+  format="${self.format()}">
+##
+## "introduction" block.  Override to create a custom unit.
+##
+<%block name="introduction">
+<vertical
+  url_name="${self.introduction_unit_url()}"
+  display_name="${self.introduction_unit_name()}">
+${partials.markdown_file(
+  url_name=capture(self.content_markdown_url),
+  display_name=capture(self.content_markdown_name),
+  filename=capture(self.content_markdown_filename))}
+</vertical>
+</%block>
+##
+## "lab" block.  Override to create a custom unit.
+##
+<%block name="lab">
+<vertical
+  url_name="${self.lab_unit_url()}"
+  display_name="${self.lab_unit_name()}">
+##
+## "lab_instructions" block. Override with no content to disable.
+##
+<%block name="lab_instructions">
+${partials.markdown_file_wrapped(
+  url_name=capture(self.lab_markdown_url),
+  display_name=capture(self.lab_markdown_name),
+  filename=capture(self.lab_markdown_filename),
+  class_name="lab_instructions")}
+</%block>\
+##
+## "hastexo" block. Override with no content to disable.
+##
+<%block name="hastexo">
+<hastexo
+  display_name="${self.lab_name()}"
+  url_name="${self.lab_url()}"
+  stack_template_path="hot_lab.yaml"
+  stack_user_name="training">
+##
+## "hastexo_tests" block.
+##
+<%block name="hastexo_tests" />
+##
+## End of hastexo block.
+##
+</hastexo>
+</%block>
+##
+## End of lab block.
+##
+</vertical>
+</%block>
+##
+## Body definition.  Use it in child templates to create more units.
+##
+${self.body()}
+##
+## End of sequential block.
+##
+</sequential>
