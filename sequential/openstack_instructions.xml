@@ -6,10 +6,10 @@
   graded="True">
   <vertical
     display_name="Unit 1"
-    url_name="openstack">
+    url_name="openstack_instructions">
     <html
       display_name="openstack"
-      url_name="openstack">
+      url_name="openstack_instructions">
       <%block filter="olx_helpers.markdown_file">markdown/openstack_instructions.md</%block>
     </html>
   </vertical>
