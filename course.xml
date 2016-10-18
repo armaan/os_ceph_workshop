@@ -1,7 +1,7 @@
 <course
   display_name="Automatic deployment and integration of OpenStack and Ceph with Ansible "
   url_name="summit"
-  course="Ansible workshop"
+  course="osa202"
   org="hastexo">
   <chapter url_name="chapter_1"/>
   <chapter url_name="chapter_2"/>

@@ -4,7 +4,7 @@
 ## be defined:
 ##
 <%def name="display_name()">Automatic deployment and integration of OpenStack and Ceph with Ansible</%def>
-<%def name="course()">Ansible workshop</%def>
+<%def name="course()">osa202</%def>
 <%def name="org()">hastexo</%def>
 ##
 ## These require context variables set by olx-utils, and are defined here for
