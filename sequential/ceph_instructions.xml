@@ -14,10 +14,10 @@
   </vertical>
   <vertical
     display_name="Lab: Ceph"
-    url_name="ceph">
+    url_name="ceph_lab">
     <hastexo
       display_name="Lab: Ceph"
-      url_name="ceph"
+      url_name="ceph_lab"
       instructions_path="markdown_ceph_instructions.md"
       stack_template_path="lab.yaml"
       stack_user_name="training"

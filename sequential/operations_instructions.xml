@@ -4,19 +4,19 @@
   graded="True">
   <vertical
     display_name="Unit 1"
-    url_name="openstack">
+    url_name="operations">
     <html
-      display_name="openstack"
-      url_name="openstack">
+      display_name="operations"
+      url_name="operations">
       <%block filter="olx_helpers.markdown_file">markdown/operations_instructions.md</%block>
     </html>
   </vertical>
   <vertical
     display_name="Lab: Openstack"
-    url_name="openstack">
+    url_name="operations_lab">
     <hastexo
       display_name="Lab: Openstack"
-      url_name="openstack"
+      url_name="operations_lab"
       instructions_path="operations_instructions.md"
       stack_template_path="lab.yaml"
       stack_user_name="training"
