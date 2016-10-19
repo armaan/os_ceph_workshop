@@ -10,7 +10,7 @@
       display_name="Lab: Ceph"
       url_name="ceph_lab"
       instructions_path="markdown_ceph_instructions.md"
-      stack_template_path="lab.yaml"
+      stack_template_path="hot_lab.yaml"
       stack_user_name="training"
       os_auth_url="https://identity1.citycloud.com:5000/v3"
       os_username="hastexo-lab"
