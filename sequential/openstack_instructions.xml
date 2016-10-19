@@ -1,14 +1,14 @@
 <sequential
   display_name="OpenStack"
   format="Lab"
-  graded="True">
+  graded="False">
   <vertical
     display_name="Lab: Openstack"
     url_name="openstack_lab">
     <hastexo
       display_name="Lab: Openstack"
       url_name="openstack_lab"
-      instructions_path="openstack_instructions.md"
+      instructions_path="markdown_openstack_instructions.md"
       stack_template_path="hot_lab.yaml"
       stack_user_name="training"
       os_auth_url="https://identity1.citycloud.com:5000/v3"

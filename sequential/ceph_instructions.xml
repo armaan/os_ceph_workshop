@@ -2,7 +2,7 @@
 <sequential
   display_name="Ceph"
   format="Lab"
-  graded="True">
+  graded="False">
   <vertical
     display_name="Lab: Ceph"
     url_name="ceph_lab">
