@@ -4,15 +4,6 @@
   format="Lab"
   graded="True">
   <vertical
-    display_name="Unit 1"
-    url_name="ceph_instructions">
-    <html
-      display_name="Ceph"
-      url_name="ceph_instructions">
-      <%block filter="olx_helpers.markdown_file">markdown/ceph_instructions.md</%block>
-    </html>
-  </vertical>
-  <vertical
     display_name="Lab: Ceph"
     url_name="ceph_lab">
     <hastexo

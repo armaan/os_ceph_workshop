@@ -3,15 +3,6 @@
   format="Lab"
   graded="True">
   <vertical
-    display_name="Unit 1"
-    url_name="operations_instructions">
-    <html
-      display_name="operations_instructions"
-      url_name="operations">
-      <%block filter="olx_helpers.markdown_file">markdown/operations_instructions.md</%block>
-    </html>
-  </vertical>
-  <vertical
     display_name="Lab: Openstack"
     url_name="operations_lab">
     <hastexo
