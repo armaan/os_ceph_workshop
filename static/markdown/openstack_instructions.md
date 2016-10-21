@@ -49,9 +49,9 @@ _alice_, follow these instructions using the terminal below:
 
 ## Configuration files.
 
-The *`/etc/openstack_deploy/openstack_user_config.yml`* describes the layout for this environment.
-The *`/etc/openstack_deploy/user_variables.yml`* file defines the global overrides for the default variables
-The *`/etc/openstack_deploy/user_secrets.yml`* file contains service credentials for all services.
+1. The `/etc/openstack_deploy/openstack_user_config.yml` describes the layout for this environment.
+2. The `/etc/openstack_deploy/user_variables.yml` file defines the global overrides for the default variables
+3. The `/etc/openstack_deploy/user_secrets.yml` file contains service credentials for all services.
 
 
 ## Bootstrapping OpenStack Ansible

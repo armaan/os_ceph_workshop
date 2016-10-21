@@ -126,17 +126,17 @@ rebuild it.
 
 Destroy a container
 
-   lxc-stop -n alice_horizon_container-7ef1c264
-   lxc-destroy -n alice_horizon_container-7ef1c264
+     lxc-stop -n alice_horizon_container-7ef1c264
+     lxc-destroy -n alice_horizon_container-7ef1c264
 
 Rebuild the container
 
-   openstack-ansible setup-hosts.yml --limit alice \
-    --limit alice_horizon_container-7ef1c264
+     openstack-ansible setup-hosts.yml --limit alice \
+     --limit alice_horizon_container-7ef1c264
 
 Install the service again   
 
-    openstack-ansible os-horizon-install.yml --limit alice_cinder_api_container-cafcfea0  
+     openstack-ansible os-horizon-install.yml --limit alice_cinder_api_container-cafcfea0  
 
 
 
@@ -144,43 +144,43 @@ Install the service again
 
 Go to _deploy_ machine and execute these lines.
 
-    # source openstackrc
+     # source openstackrc
 
 Create a swift user
    
-    # openstack user create --domain default --password-prompt swift
+     # openstack user create --domain default --password-prompt swift
 
 Assign admin role to the swift user.
   
-    # openstack role add --project service --user swift admin
+     # openstack role add --project service --user swift admin
 
 Create the swift service
   
-    # openstack service create --name swift --description \
+     # openstack service create --name swift --description \
         "OpenStack  Object Storage" object-store
 
 Create swift endpoints.
-    openstack endpoint create --region RegionOne   swift public http://192.168.122.114:8080/swift/v1
-    openstack endpoint create --region RegionOne   swift internal http://192.168.122.114:8080/swift/v1
-    openstack endpoint create --region RegionOne   swift admin http://192.168.122.114:8080/swift/v1
+     openstack endpoint create --region RegionOne   swift public http://192.168.122.114:8080/swift/v1
+     openstack endpoint create --region RegionOne   swift internal http://192.168.122.114:8080/swift/v1
+     openstack endpoint create --region RegionOne   swift admin http://192.168.122.114:8080/swift/v1
 
 
 Add these lines to the ceph.conf file on _daisy_ and restart radosgw.
 
-    rgw keystone url = http://172.29.236.10:35357
-    rgw keystone admin user = swift
-    rgw keystone admin password = [Password]
-    rgw keystone admin tenant = service
-    rgw keystone accepted roles = Member, admin, swiftoperator
-    rgw keystone token cache size = 500
-    rgw keystone revocation interval = 500
-    rgw s3 auth use keystone = true
-    rgw nss db path = /var/ceph/nss
+     rgw keystone url = http://172.29.236.10:35357
+     rgw keystone admin user = swift
+     rgw keystone admin password = [Password]
+     rgw keystone admin tenant = service
+     rgw keystone accepted roles = Member, admin, swiftoperator
+     rgw keystone token cache size = 500
+     rgw keystone revocation interval = 500
+     rgw s3 auth use keystone = true
+     rgw nss db path = /var/ceph/nss
 
 Restart radosgw service.
 
-    # sudo service radosgw restart id=rgw.daisy
+     # sudo service radosgw restart id=rgw.daisy
 
 List swift containers:
 
-    # swift list
+     # swift list

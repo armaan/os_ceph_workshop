@@ -34,11 +34,11 @@ find it, simply scroll down.
 The lab environment consists of five virtual machines, accessible via the
 following local IP addresses.
 
-    * _deploy_: **`192.168.122.100`**
-    * _alice_: **`192.168.122.111`**
-    * _bob_: **`192.168.122.112`**
-    * _charlie_: **`192.168.122.113`**
-    * _daisy_: **`192.168.122.114`**
+* _deploy_: **`192.168.122.100`**
+* _alice_: **`192.168.122.111`**
+* _bob_: **`192.168.122.112`**
+* _charlie_: **`192.168.122.113`**
+* _daisy_: **`192.168.122.114`**
 
 The _deploy_ node  has a publicly available IP address.
 Your terminal automatically connects to _deploy_.
