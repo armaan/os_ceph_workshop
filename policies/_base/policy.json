@@ -9,7 +9,7 @@
     "max_student_enrollments_allowed": null,
     "due": null,
     "giturl": null,
-    "course_image": "images_course_image.jpg",
+    "course_image": "images_course_image.png",
     "advanced_modules": ["pdf"],
     "hide_from_toc": false,
     "ispublic": false,

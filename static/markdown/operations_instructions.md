@@ -160,9 +160,10 @@ Create the swift service
         "OpenStack  Object Storage" object-store
 
 Create swift endpoints.
-     openstack endpoint create --region RegionOne   swift public http://192.168.122.114:8080/swift/v1
-     openstack endpoint create --region RegionOne   swift internal http://192.168.122.114:8080/swift/v1
-     openstack endpoint create --region RegionOne   swift admin http://192.168.122.114:8080/swift/v1
+
+     # openstack endpoint create --region RegionOne   swift public http://192.168.122.114:8080/swift/v1
+     # openstack endpoint create --region RegionOne   swift internal http://192.168.122.114:8080/swift/v1
+     # openstack endpoint create --region RegionOne   swift admin http://192.168.122.114:8080/swift/v1
 
 
 Add these lines to the ceph.conf file on _daisy_ and restart radosgw.
