@@ -185,3 +185,69 @@ Restart radosgw service.
 List swift containers:
 
      # swift list
+
+
+## Galera cluster recovery
+
+Openstack-Ansible provides a galera-bootstrap playbook to automatically recover a node or an entire environment. 
+Run the galera install playbook using the galera-bootstrap tag to auto recover a node or an entire environment.
+
+## Single-node failure
+
+     # root@deploy:/home/training/openstack-ansible/playbooks# ansible galera_container -m shell -a "mysql -h localhost \
+       -e 'show status like \"%wsrep_cluster_%\";'"
+
+     bob_galera_container-a307d212 | success | rc=0 >>
+     Variable_name   Value
+     wsrep_cluster_conf_id   4
+     wsrep_cluster_size      2
+     wsrep_cluster_state_uuid        2897fee6-98a5-11e6-9c74-ae25a2ab63a2
+     wsrep_cluster_status    Primary
+
+     charlie_galera_container-90d41b55 | FAILED | rc=1 >>
+     ERROR 2002 (HY000): Can't connect to local MySQL server through socket '/var/run/mysqld/mysqld.sock' (2 "No such file or directory")
+
+     alice_galera_container-fe62fee3 | success | rc=0 >>
+     Variable_name   Value
+     wsrep_cluster_conf_id   4
+     wsrep_cluster_size      2
+     wsrep_cluster_state_uuid        2897fee6-98a5-11e6-9c74-ae25a2ab63a2
+     wsrep_cluster_status    Primary
+
+As you can see, the mysql is not active on _charlie_. Let's run the galera playbook with `galera-bootstrap` tag
+to fix the galera cluster.
+
+     # root@deploy:/home/training/openstack-ansible/playbooks# openstack-ansible galera-install.yml --tags galera-bootstrap
+
+     PLAY RECAP ********************************************************************
+     alice_galera_container-fe62fee3 : ok=11   changed=0    unreachable=0    failed=0
+     bob_galera_container-a307d212 : ok=11   changed=0    unreachable=0    failed=0
+     charlie_galera_container-90d41b55 : ok=12   changed=4    unreachable=0    failed=0
+
+
+## How to leverage dynamic inventory
+
+OpenStack-Ansible uses `scripts/inventory-manage.py` script to generate the inventory of hosts and containers within the environment.
+
+The dynamic inventory script does the following:
+
+     1. It will generate the names of all the container that runs a service.
+     2. It will generate container and IP address mappings
+     3. It will assign containers to physical hosts.
+
+Let's try a few commands now.
+
+List all hosts:
+
+     # scripts/inventory-manage.py -l 
+
+List all hosts and containers by their group
+
+     # scripts/inventory-manage.py -g
+
+List all of the containers:
+
+     # scripts/inventory-manage.py -G
+
+
+Congratulation! You have completed the workshop.
