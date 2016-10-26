@@ -23,7 +23,7 @@ parameters:
   controller_flavor:
     type: string
     description: Flavor to use for controller nodes
-    default: 2C-4GB-100GB
+    default: 4C-8GB-100GB
   compute_flavor:
     type: string
     description: Flavor to use for compute nodes
