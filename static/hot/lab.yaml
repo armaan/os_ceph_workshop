@@ -23,19 +23,19 @@ parameters:
   controller_flavor:
     type: string
     description: Flavor to use for controller nodes
-    default: 4C-8GB-100GB
+    default: 2C-4GB-100GB
   compute_flavor:
     type: string
     description: Flavor to use for compute nodes
-    default: 2C-4GB-50GB 
+    default: 2C-2GB-50GB
   volume_flavor:
     type: string
     description: Flavor to use for volume nodes
-    default: 2C-4GB-20GB-20GB
+    default: 2C-2GB-20GB-20GB
   gateway_flavor:
     type: string
     description: Flavor to use for network gateway nodes
-    default: 2C-4GB-50GB
+    default: 1C-2GB-50GB
   public_net_id:
     type: string
     description: Public network ID
@@ -277,50 +277,24 @@ resources:
               shared-infra_hosts:
                 alice:
                   affinity:
-                    galera_container: 1
-                    rabbit_mq_container: 1
+                    galera_container: 3
+                    rabbit_mq_container: 3
                   ip: 172.29.236.10
-                bob:
-                  affinity:
-                    galera_container: 1
-                    rabbit_mq_container: 1
-                  ip: 172.29.236.11
-                charlie:
-                  affinity:
-                    galera_container: 1
-                    rabbit_mq_container: 1
-                  ip: 172.29.236.12
               os-infra_hosts:
                 alice:
                   ip: 172.29.236.10
-                bob:
-                  ip: 172.29.236.11
-                charlie:
-                  ip: 172.29.236.12
               repo-infra_hosts:
                 alice:
                   ip: 172.29.236.10
-                bob:
-                  ip: 172.29.236.11
-                charlie:
-                  ip: 172.29.236.12
               identity_hosts:
                 alice:
                   ip: 172.29.236.10
-                bob:
-                  ip: 172.29.236.11
-                charlie:
-                  ip: 172.29.236.12
               compute_hosts:
                 bob:
                   ip: 172.29.236.11
               storage-infra_hosts:
                 alice:
                   ip: 172.29.236.10
-                bob:
-                  ip: 172.29.236.11
-                charlie:
-                  ip: 172.29.236.12
               storage_hosts:
                 daisy:
                   ip: 172.29.236.13
@@ -376,6 +350,7 @@ resources:
               glance_swift_store_endpoint_type: internalURL
               nova_virt_type: qemu
               lxc_container_default_mtu: 1400
+              lxc_net_mtu: 1450
               keystone_auth_admin_password: openstack
               ssl_protocol: "ALL -SSLv2 -SSLv3"
               ssl_cipher_suite: "ECDH+AESGCM:DH+AESGCM:ECDH+AES256:DH+AES256:ECDH+AES128:DH+AES:ECDH+3DES:DH+3DES:RSA+AESGCM:RSA+AES:RSA+3DES:!aNULL:!MD5:!DSS"
