@@ -14,5 +14,5 @@
 <%def name="suffix()">${olx_helpers.suffix(run_suffix)}</%def>
 <%def name="start()">${olx_helpers.date(start_date)}</%def>
 <%def name="end()">${olx_helpers.date(end_date)}</%def>
-<%def name="invitation_only()">${u"false" if is_public else u"true"}</%def>
-<%def name="ispublic()">${u"true" if is_public else u"false"}</%def>
+<%def name="invitation_only()">false</%def>
+<%def name="ispublic()">true</%def>
